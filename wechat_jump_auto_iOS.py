@@ -23,11 +23,24 @@ import random
 import json
 from PIL import Image, ImageDraw
 import wda
-
+# import wechat_jump_game.common as common
+try:
+    from wechat_jump_game.common import apiutil
+    from wechat_jump_game.common.compression import resize_image
+    print('Load from wechat_jump_game.')
+except:
+    from common import debug, config, screenshot, UnicodeStreamFilter
+    # from common.auto_adb import auto_adb
+    from common import apiutil
+    from common.compression import resize_image
+    print('Load from Douyin-Bot/')
+import sys
 
 with open('config.json', 'r') as f:
     config = json.load(f)
 
+####################################################################
+######################## Wechat_Jump ###############################
 
 # Magic Number，不设置可能无法正常执行，请根据具体截图从上到下按需设置
 under_game_score_y = config['under_game_score_y']
@@ -45,18 +58,68 @@ swipe = config.get('swipe', {
     "y1": 410,
     "x2": 320,
     "y2": 410
-    })
+})
 VERSION = "1.1.4"
-c = wda.Client()
-s = c.session()
 
 screenshot_backup_dir = 'screenshot_backups/'
 if not os.path.isdir(screenshot_backup_dir):
     os.mkdir(screenshot_backup_dir)
 
+#####################################################################
+########################### DouYin ##################################
 
-def pull_screenshot():
-    c.screenshot('1.png')
+# 申请地址 http://ai.qq.com
+AppID = '1106858595'
+AppKey = 'bNUNgOpY6AeeJjFu'
+
+FACE_PATH = 'face/'
+
+Max_Try = 10
+Girls = True
+Follow_Her = False
+Like_Her = True
+# 审美标准
+BEAUTY_THRESHOLD = 80
+Likes_max = 5
+
+Save_Origin = True
+Save_Whole = True
+Save_Face = True
+
+######### Which App to Use ##########
+App_List = ['DouYin', 'Wechat_Jump']
+Use_App = 'DouYin'
+
+if len(sys.argv) == 1:
+    Follow_Sign_x = 688
+    Follow_Sign_y = 660
+else:
+    Follow_Sign_x = int(sys.argv[1])
+    Follow_Sign_y = int(sys.argv[2])
+
+################################################
+
+c = wda.Client(url='http://18.189.58.186:8100')
+s = c.session()
+
+
+
+
+def _random_bias(num):
+    """
+    random bias
+    :param num:
+    :return:
+    """
+    print('num = ', num)
+    return random.randint(-num, num)
+
+def pull_screenshot(Use_App='Wechat_Jump', id=0):
+    if 'Wechat_Jump' in Use_App:
+        c.screenshot('1.png')
+    elif 'DouYin' in Use_App:
+        c.screenshot(FACE_PATH + 'autojump.png')
+    
 
 
 def jump(distance):
@@ -183,26 +246,81 @@ def find_piece_and_board(im):
 
 
 def main():
-    while True:
-        pull_screenshot()
-        im = Image.open("./1.png")
+    if 'Wechat_Jump' in Use_App:
+        while True:
+            pull_screenshot()
+            im = Image.open("./1.png")
+            
+            # 获取棋子和 board 的位置
+            piece_x, piece_y, board_x, board_y = find_piece_and_board(im)
+            ts = int(time.time())
+            print(ts, piece_x, piece_y, board_x, board_y)
+            if piece_x == 0:
+                return
+    
+            set_button_position(im)
+            distance = math.sqrt(
+                (board_x - piece_x) ** 2 + (board_y - piece_y) ** 2)
+            jump(distance)
+    
+            save_debug_creenshot(ts, im, piece_x, piece_y, board_x, board_y)
+            backup_screenshot(ts)
+            # 为了保证截图的时候应落稳了，多延迟一会儿，随机值防 ban
+            time.sleep(random.uniform(1, 1.1))
+    elif 'DouYin' in Use_App:
+        for i in range(Max_Try):
+            
+            time.sleep(3)
+            
+            pull_screenshot(Use_App=Use_App)
+            if Save_Origin:
+                im = Image.open(FACE_PATH + 'autojump.png')
+                im.save(FACE_PATH + 'autojump_%s.png'%(i))
+            
+            try:
+                resize_image(FACE_PATH + 'autojump.png', FACE_PATH + 'optimized.png', 1024 * 1024)
+                with open(FACE_PATH + 'optimized.png', 'rb') as bin_data:
+                    image_data = bin_data.read()
+            except:
+                with open(FACE_PATH + 'autojump.png', 'rb') as bin_data:
+                    image_data = bin_data.read()
 
-        # 获取棋子和 board 的位置
-        piece_x, piece_y, board_x, board_y = find_piece_and_board(im)
-        ts = int(time.time())
-        print(ts, piece_x, piece_y, board_x, board_y)
-        if piece_x == 0:
-            return
+            ai_obj = apiutil.AiPlat(AppID, AppKey)
+            rsp = ai_obj.face_detectface(image_data, 0)
 
-        set_button_position(im)
-        distance = math.sqrt(
-            (board_x - piece_x) ** 2 + (board_y - piece_y) ** 2)
-        jump(distance)
+            if rsp['ret'] == 0:
+                beauty = 0
+                for face in rsp['data']['face_list']:
+                    print(face)
+                    face_area = (face['x'], face['y'], face['x'] + face['width'], face['y'] + face['height'])
+                    print(face_area)
+                    img = Image.open(FACE_PATH + "optimized.png")
+                    if Save_Whole:
+                        img.save(FACE_PATH + face['face_id'] + '_Whole.png')
+                    if Save_Face:
+                        cropped_img = img.crop(face_area).convert('RGB')
+                        cropped_img.save(FACE_PATH + face['face_id'] + '.png')
+                    # 性别判断
+                    if Girls:
+                        if face['beauty'] > beauty and face['gender'] < 50:
+                            beauty = face['beauty']
+                    else:
+                        if face['beauty'] > beauty and face['gender'] > 50:
+                            beauty = face['beauty']
+    
+                # 是个美人儿~关注点赞走一波
+                if beauty > BEAUTY_THRESHOLD:
+                    print('发现漂亮妹子！！！')
+                    if Like_Her:
+                        for i in range((beauty - BEAUTY_THRESHOLD)/((100 - BEAUTY_THRESHOLD)/Likes_max) + 1):
+                            s.double_tap(x=config['swipe']['x1'], y=config['swipe']['y1'])
+                            time.sleep(0.5)
+                    if Follow_Her:
+                        s.tap(x=Follow_Sign_x, y=Follow_Sign_y)
+                        time.sleep(0.5)
 
-        save_debug_creenshot(ts, im, piece_x, piece_y, board_x, board_y)
-        backup_screenshot(ts)
-        # 为了保证截图的时候应落稳了，多延迟一会儿，随机值防 ban
-        time.sleep(random.uniform(1, 1.1))
+            s.swipe_down()
+            
 
 
 if __name__ == '__main__':
