@@ -36,74 +36,7 @@ except:
     print('Load from Douyin-Bot/')
 import sys
 
-with open('config.json', 'r') as f:
-    config = json.load(f)
-
-####################################################################
-######################## Wechat_Jump ###############################
-
-# Magic Number，不设置可能无法正常执行，请根据具体截图从上到下按需设置
-under_game_score_y = config['under_game_score_y']
-# 长按的时间系数，请自己根据实际情况调节
-press_coefficient = config['press_coefficient']
-# 二分之一的棋子底座高度，可能要调节
-piece_base_height_1_2 = config['piece_base_height_1_2']
-# 棋子的宽度，比截图中量到的稍微大一点比较安全，可能要调节
-piece_body_width = config['piece_body_width']
-time_coefficient = config['press_coefficient']
-
-# 模拟按压的起始点坐标，需要自动重复游戏请设置成“再来一局”的坐标
-swipe = config.get('swipe', {
-    "x1": 320,
-    "y1": 410,
-    "x2": 320,
-    "y2": 410
-})
-VERSION = "1.1.4"
-
-screenshot_backup_dir = 'screenshot_backups/'
-if not os.path.isdir(screenshot_backup_dir):
-    os.mkdir(screenshot_backup_dir)
-
-#####################################################################
-########################### DouYin ##################################
-
-# 申请地址 http://ai.qq.com
-AppID = '1106858595'
-AppKey = 'bNUNgOpY6AeeJjFu'
-
-FACE_PATH = 'face/'
-
-Max_Try = 10
-Girls = True
-Follow_Her = False
-Like_Her = True
-# 审美标准
-BEAUTY_THRESHOLD = 80
-Likes_max = 5
-
-Save_Origin = True
-Save_Whole = True
-Save_Face = True
-
-######### Which App to Use ##########
-App_List = ['DouYin', 'Wechat_Jump']
-Use_App = 'DouYin'
-
-if len(sys.argv) == 1:
-    Follow_Sign_x = 688
-    Follow_Sign_y = 660
-else:
-    Follow_Sign_x = int(sys.argv[1])
-    Follow_Sign_y = int(sys.argv[2])
-
 ################################################
-
-c = wda.Client(url='http://18.189.58.186:8100')
-s = c.session()
-
-
-
 
 def _random_bias(num):
     """
@@ -114,7 +47,7 @@ def _random_bias(num):
     print('num = ', num)
     return random.randint(-num, num)
 
-def pull_screenshot(Use_App='Wechat_Jump', id=0):
+def pull_screenshot(Use_App='Wechat_Jump', FACE_PATH = '', id=0):
     if 'Wechat_Jump' in Use_App:
         c.screenshot('1.png')
     elif 'DouYin' in Use_App:
@@ -244,9 +177,63 @@ def find_piece_and_board(im):
 
     return piece_x, piece_y, board_x, board_y
 
+######### Which App to Use ##########
+App_List = ['DouYin', 'Wechat_Jump']
+Use_App = 'DouYin'
+
+c = wda.Client(url='http://18.189.58.186:8100')
+s = c.session()
+
+if len(sys.argv) == 1:
+    try:
+        w = s.window_size()[0]
+        h = s.window_size()[1]
+        Follow_Sign_x = w/1080 * 990
+        Follow_Sign_y = h/1920 * 950
+    except:
+        w = 750
+        h = 1334
+        Follow_Sign_x = 688
+        Follow_Sign_y = 660
+else:
+    w = int(sys.argv[1])
+    h = int(sys.argv[2])
+    Follow_Sign_x = w / 1080 * 990
+    Follow_Sign_y = h / 1920 * 950
+print('Follow_Sign_x: %s; Follow_Sign_y: %s'%(Follow_Sign_x, Follow_Sign_y))
+
 
 def main():
     if 'Wechat_Jump' in Use_App:
+        ####################################################################
+        ######################## Wechat_Jump ###############################
+    
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+    
+        # Magic Number，不设置可能无法正常执行，请根据具体截图从上到下按需设置
+        under_game_score_y = config['under_game_score_y']
+        # 长按的时间系数，请自己根据实际情况调节
+        press_coefficient = config['press_coefficient']
+        # 二分之一的棋子底座高度，可能要调节
+        piece_base_height_1_2 = config['piece_base_height_1_2']
+        # 棋子的宽度，比截图中量到的稍微大一点比较安全，可能要调节
+        piece_body_width = config['piece_body_width']
+        time_coefficient = config['press_coefficient']
+    
+        # 模拟按压的起始点坐标，需要自动重复游戏请设置成“再来一局”的坐标
+        swipe = config.get('swipe', {
+            "x1": 320,
+            "y1": 410,
+            "x2": 320,
+            "y2": 410
+        })
+        VERSION = "1.1.4"
+    
+        screenshot_backup_dir = 'screenshot_backups/'
+        if not os.path.isdir(screenshot_backup_dir):
+            os.mkdir(screenshot_backup_dir)
+        
         while True:
             pull_screenshot()
             im = Image.open("./1.png")
@@ -267,12 +254,35 @@ def main():
             backup_screenshot(ts)
             # 为了保证截图的时候应落稳了，多延迟一会儿，随机值防 ban
             time.sleep(random.uniform(1, 1.1))
+    
     elif 'DouYin' in Use_App:
+        #####################################################################
+        ########################### DouYin ##################################
+    
+        # 申请地址 http://ai.qq.com
+        AppID = '1106858595'
+        AppKey = 'bNUNgOpY6AeeJjFu'
+    
+        FACE_PATH = 'face/'
+    
+        Max_Try = 5
+        Girls = True
+        Follow_Her = True
+        Like_Her = True
+        # 审美标准
+        BEAUTY_THRESHOLD = 80
+        Likes_max = 2
+    
+        Save_Origin = True
+        Save_Whole = True
+        Save_Face = True
         for i in range(Max_Try):
+            c = wda.Client(url='http://18.189.58.186:8100')
+            s = c.session()
+            s.swipe_up_pro()
+            time.sleep(1)
             
-            time.sleep(3)
-            
-            pull_screenshot(Use_App=Use_App)
+            pull_screenshot(Use_App=Use_App, FACE_PATH=FACE_PATH)
             if Save_Origin:
                 im = Image.open(FACE_PATH + 'autojump.png')
                 im.save(FACE_PATH + 'autojump_%s.png'%(i))
@@ -287,7 +297,7 @@ def main():
 
             ai_obj = apiutil.AiPlat(AppID, AppKey)
             rsp = ai_obj.face_detectface(image_data, 0)
-
+            
             if rsp['ret'] == 0:
                 beauty = 0
                 for face in rsp['data']['face_list']:
@@ -307,19 +317,27 @@ def main():
                     else:
                         if face['beauty'] > beauty and face['gender'] > 50:
                             beauty = face['beauty']
-    
+                    
+                    
                 # 是个美人儿~关注点赞走一波
                 if beauty > BEAUTY_THRESHOLD:
                     print('发现漂亮妹子！！！')
+                    print('漂亮指数: %s' %beauty)
                     if Like_Her:
-                        for i in range((beauty - BEAUTY_THRESHOLD)/((100 - BEAUTY_THRESHOLD)/Likes_max) + 1):
-                            s.double_tap(x=config['swipe']['x1'], y=config['swipe']['y1'])
-                            time.sleep(0.5)
+                        for i in range(int((beauty - BEAUTY_THRESHOLD)/((100 - BEAUTY_THRESHOLD)/Likes_max) + 1)):
+                            s.double_tap(x=w/2, y=h/2)
+                            print('Heart!')
+                            # time.sleep(0.11)
+                            
                     if Follow_Her:
                         s.tap(x=Follow_Sign_x, y=Follow_Sign_y)
-                        time.sleep(0.5)
+                        print('Follow!')
+                        # time.sleep(0.2)
+                    # time.sleep(1)
+                else:
+                    print('漂亮指数: %s' % beauty)
 
-            s.swipe_down()
+            # s.swipe_up_pro()
             
 
 
